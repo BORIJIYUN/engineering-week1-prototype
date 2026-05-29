@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>인터벌 트래커</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* =========================================================
+     ⚙️  여기 숫자만 바꾸면 강도별 속도 / 세트 수 / 휴식시간이 바뀝니다
+     setSec : 한 세트 동안 에너지 100→0 까지 걸리는 시간(초)
+     sets   : 강도 선택 시 자동으로 진행되는 세트 횟수(N)
+     ========================================================= */
+  :root{
+    --bg:#0d0f14;
+    --panel:#161a22;
+    --line:#262c38;
+    --txt:#f2f4f8;
+    --sub:#8a93a6;
+    --accent:#ffb02e;          /* 현재 강도 색 (JS가 교체) */
+    --glow:rgba(255,176,46,.45);
+    --ring-track:#222834;
+    --rest:#4ea8ff;            /* 휴식 색 */
+    --rest-glow:rgba(78,168,255,.5);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:'IBM Plex Sans KR',sans-serif;
+    background:var(--bg);
+    color:var(--txt);
+    display:flex;justify-content:center;align-items:center;
+    overflow:hidden;
+  }
+
+  /* ----- 폰(휴대폰 프레임) ----- */
+  .phone{
+    position:relative;
+    width:390px;height:780px;max-height:96vh;
+    background:radial-gradient(120% 80% at 50% 0%, #1a1f2b 0%, var(--bg) 55%);
+    border-radius:42px;
+    border:1px solid #20252f;
+    box-shadow:0 40px 90px rgba(0,0,0,.6), inset 0 0 0 6px #05070b;
+    overflow:hidden;
+    display:flex;flex-direction:column;
+    transition:background .6s ease;
+  }
+  .phone.resting{background:radial-gradient(120% 80% at 50% 0%, #15263e 0%, #0a0f17 58%)}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:130px;height:26px;background:#05070b;border-radius:0 0 18px 18px;z-index:30}
+
+  .screen{flex:1;display:flex;flex-direction:column;padding:54px 26px 30px;position:relative}
+
+  /* ----- 상단 헤더 ----- */
+  .top{display:flex;justify-content:space-between;align-items:center;min-height:30px}
+  .top .title{font-size:13px;letter-spacing:.18em;color:var(--sub);font-weight:600;text-transform:uppercase}
+  .pill{font-size:12px;font-weight:600;color:var(--accent);border:1px solid var(--line);
+        padding:5px 12px;border-radius:20px;background:var(--panel)}
+
+  /* ----- 세트 진행 점 ----- */
+  .dots{display:flex;gap:7px;justify-content:center;margin-top:18px;height:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ring-track);transition:.3s}
+  .dot.done{background:var(--accent)}
+  .dot.active{background:var(--accent);box-shadow:0 0 0 4px var(--glow);transform:scale(1.15)}
+
+  /* ----- 중앙 게이지 ----- */
+  .stage{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;position:relative}
+  .gauge{position:relative;width:260px;height:260px;display:flex;justify-content:center;align-items:center;transition:transform .4s}
+  .gauge svg{transform:rotate(-90deg);position:absolute;inset:0}
+  .gauge .track{fill:none;stroke:var(--ring-track);stroke-width:14}
+  .gauge .prog{fill:none;stroke:var(--accent);stroke-width:14;stroke-linecap:round;
+               filter:drop-shadow(0 0 10px var(--glow));transition:stroke .4s}
+  .gauge.rest{animation:breathe 3.2s ease-in-out infinite}
+  @keyframes breathe{0%,100%{transform:scale(.97)}50%{transform:scale(1.04)}}
+  .center{display:flex;flex-direction:column;align-items:center;z-index:2}
+  .rest-tag{display:none;align-items:center;gap:6px;font-size:13px;font-weight:600;
+            letter-spacing:.1em;color:var(--rest);margin-bottom:6px}
+  .gauge.rest .rest-tag{display:flex}
+  .energy{font-family:'Anton',sans-serif;font-size:84px;line-height:.9;letter-spacing:.01em}
+  .energy small{font-size:30px;color:var(--sub);margin-left:2px}
+  .stlabel{margin-top:8px;font-size:14px;letter-spacing:.16em;color:var(--sub);font-weight:600;text-transform:uppercase}
+
+  .status{margin-top:34px;font-size:15px;color:var(--sub);min-height:22px;text-align:center;font-weight:400}
+  .status b{color:var(--txt);font-weight:600}
+
+  /* ----- 하단 컨트롤 ----- */
+  .controls{display:flex;flex-direction:column;gap:12px;margin-top:24px}
+  .btn{border:none;border-radius:16px;font-family:inherit;font-weight:600;font-size:16px;
+       padding:17px;cursor:pointer;transition:transform .12s, opacity .2s;color:#0d0f14}
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:var(--accent);box-shadow:0 8px 24px var(--glow)}
+  .btn.ghost{background:transparent;color:var(--sub);border:1px solid var(--line)}
+
+  /* ----- 강도 선택 (대기 화면) ----- */
+  .intro{text-align:center;margin-bottom:6px}
+  .intro h1{font-size:26px;font-weight:700;line-height:1.3;margin-bottom:8px}
+  .intro p{font-size:13px;color:var(--sub);line-height:1.6}
+  .levels{display:flex;flex-direction:column;gap:12px;width:100%}
+  .level{display:flex;align-items:center;justify-content:space-between;
+         background:var(--panel);border:1px solid var(--line);border-radius:18px;
+         padding:18px 20px;cursor:pointer;transition:transform .12s,border-color .2s,background .2s}
+  .level:active{transform:scale(.98)}
+  .level .lv-left{display:flex;align-items:center;gap:14px}
+  .lv-bar{display:flex;gap:3px;align-items:flex-end;height:26px}
+  .lv-bar i{width:6px;border-radius:2px;background:var(--c);display:block}
+  .level .lv-name{font-size:18px;font-weight:700}
+  .level .lv-desc{font-size:12px;color:var(--sub);margin-top:2px}
+  .level .lv-meta{font-size:12px;color:var(--sub);text-align:right;line-height:1.5}
+  .level .lv-meta b{color:var(--txt);font-weight:600}
+
+  /* 강도별 색 */
+  .level[data-k="high"]   .lv-bar i{--c:#ff4d3d}
+  .level[data-k="medium"] .lv-bar i{--c:#ffb02e}
+  .level[data-k="low"]    .lv-bar i{--c:#2dd4a7}
+
+  /* ----- 완료 화면 ----- */
+  .done-icon{width:88px;height:88px;border-radius:50%;background:var(--accent);
+             display:flex;justify-content:center;align-items:center;margin:0 auto 24px;
+             box-shadow:0 10px 30px var(--glow);font-size:44px}
+
+  /* 세트완료 플래시 */
+  .flash{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;
+         pointer-events:none;opacity:0;z-index:20}
+  .flash span{font-family:'Anton',sans-serif;font-size:40px;color:var(--accent);
+              text-shadow:0 0 30px var(--glow);letter-spacing:.04em}
+  @keyframes flashpop{0%{opacity:0;transform:scale(.6)}25%{opacity:1;transform:scale(1)}
+                      75%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.15)}}
+  .flash.go{animation:flashpop 1s ease forwards}
+
+  .hidden{display:none!important}
+  .fade{animation:fade .4s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* 일시정지 표시 깜빡임 */
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+  .blinking{animation:blink 1.2s ease-in-out infinite}
+</style>
+</head>
+<body>
+<div class="phone" id="phone">
+  <div class="notch"></div>
+  <div class="screen">
+
+    <div class="top">
+      <span class="title">Interval</span>
+      <span class="pill" id="modePill">대기</span>
+    </div>
+
+    <!-- ===== 대기: 강도 선택 ===== -->
+    <div id="view-idle" class="stage">
+      <div class="intro">
+        <h1>운동 강도를<br>선택하세요</h1>
+        <p>강도에 비례해 에너지가 소모돼요.<br>0%가 되면 한 세트 완료!</p>
+      </div>
+      <div class="levels" id="levels"></div>
+    </div>
+
+    <!-- ===== 작동 / 휴식 ===== -->
+    <div id="view-active" class="stage hidden">
+      <div class="dots" id="dots"></div>
+      <div class="gauge" id="gauge" style="margin-top:24px">
+        <svg viewBox="0 0 260 260">
+          <circle class="track" cx="130" cy="130" r="115"/>
+          <circle class="prog"  cx="130" cy="130" r="115" id="ring"/>
+        </svg>
+        <div class="center">
+          <div class="rest-tag">💤 휴식</div>
+          <div class="energy"><span id="energyNum">100</span><small id="unit">%</small></div>
+          <div class="stlabel" id="phaseLabel">SET 1</div>
+        </div>
+        <div class="flash" id="flash"><span>세트 완료!</span></div>
+      </div>
+      <div class="status" id="status">게이지 감소 중…</div>
+      <div class="controls" style="width:100%">
+        <button class="btn primary" id="pauseBtn">일시정지</button>
+        <button class="btn ghost"   id="stopBtn">종료</button>
+      </div>
+    </div>
+
+    <!-- ===== 완료 ===== -->
+    <div id="view-done" class="stage hidden">
+      <div style="text-align:center">
+        <div class="done-icon">✓</div>
+        <h1 style="font-size:26px;font-weight:700;margin-bottom:8px">운동 완료!</h1>
+        <p style="font-size:14px;color:var(--sub);line-height:1.6" id="doneText"></p>
+      </div>
+      <div class="controls" style="width:100%;margin-top:36px">
+        <button class="btn primary" id="restartBtn">다시 시작</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ===== 강도 설정 (여기 숫자만 바꾸면 됩니다) ===== */
+const INTENSITY = {
+  high:   { label:'높음', desc:'빠르게 불태우기', setSec:12, sets:6, color:'#ff4d3d', glow:'rgba(255,77,61,.45)', bars:[10,16,22,26] },
+  medium: { label:'중간', desc:'꾸준한 페이스',   setSec:20, sets:4, color:'#ffb02e', glow:'rgba(255,176,46,.45)', bars:[8,14,20,14] },
+  low:    { label:'낮음', desc:'가볍게 워밍업',   setSec:30, sets:3, color:'#2dd4a7', glow:'rgba(45,212,167,.45)', bars:[8,12,16,12] },
+};
+const REST_SEC = 8;            // 휴식 시간(초): 에너지 0→100 자동 회복
+
+/* ===== 상태 ===== */
+const R = 115, C = 2 * Math.PI * R;       // 게이지 원 둘레
+let mode='idle';                          // idle | run | rest | paused | done
+let prevMode=null;                        // 일시정지 복귀용
+let cfg=null, curSet=0, totalSets=0;
+let phaseDur=0, phaseElapsed=0, lastTs=0;
+
+/* ===== 엘리먼트 ===== */
+const $=id=>document.getElementById(id);
+const ring=$('ring'); ring.style.strokeDasharray=C;
+const views={idle:$('view-idle'),active:$('view-active'),done:$('view-done')};
+
+/* ===== 강도 선택 버튼 만들기 ===== */
+(function buildLevels(){
+  const wrap=$('levels');
+  for(const [key,v] of Object.entries(INTENSITY)){
+    const el=document.createElement('div');
+    el.className='level'; el.dataset.k=key;
+    el.innerHTML=`
+      <div class="lv-left">
+        <div class="lv-bar">${v.bars.map(h=>`<i style="height:${h}px"></i>`).join('')}</div>
+        <div><div class="lv-name">${v.label}</div><div class="lv-desc">${v.desc}</div></div>
+      </div>
+      <div class="lv-meta"><b>${v.sets}세트</b><br>세트당 ${v.setSec}초</div>`;
+    el.onclick=()=>start(key);
+    wrap.appendChild(el);
+  }
+})();
+
+/* ===== 화면 전환 ===== */
+function show(name){
+  for(const k in views) views[k].classList.toggle('hidden', k!==name);
+  views[name].classList.remove('fade'); void views[name].offsetWidth; views[name].classList.add('fade');
+}
+function setAccent(v){
+  document.documentElement.style.setProperty('--accent',v.color);
+  document.documentElement.style.setProperty('--glow',v.glow);
+}
+
+/* ===== 운동 시작 (대기 → SET 1) ===== */
+function start(key){
+  cfg=INTENSITY[key]; setAccent(cfg);
+  totalSets=cfg.sets; curSet=1;
+  buildDots();
+  show('active');
+  beginRun();
+  requestAnimationFrame(loop);
+}
+
+function buildDots(){
+  const d=$('dots'); d.innerHTML='';
+  for(let i=0;i<totalSets;i++){ const s=document.createElement('div'); s.className='dot'; d.appendChild(s); }
+}
+function paintDots(){
+  [...$('dots').children].forEach((el,i)=>{
+    el.classList.toggle('done', i<curSet-1);
+    el.classList.toggle('active', i===curSet-1);
+  });
+}
+
+/* ===== 단계 진입 ===== */
+function beginRun(){
+  mode='run'; phaseDur=cfg.setSec; phaseElapsed=0;
+  setAccent(cfg);                                   // 강도 색으로 복귀
+  $('phone').classList.remove('resting');
+  $('gauge').classList.remove('rest');
+  $('unit').textContent='%';
+  $('phaseLabel').textContent='SET '+curSet;
+  $('phaseLabel').style.color='';
+  $('status').innerHTML='게이지 감소 중… <b>0%가 되면 세트 완료</b>';
+  $('modePill').textContent='SET '+curSet+' 작동';
+  $('modePill').classList.remove('blinking');
+  paintDots(); render(100);
+}
+function beginRest(){
+  mode='rest'; phaseDur=REST_SEC; phaseElapsed=0;
+  document.documentElement.style.setProperty('--accent','var(--rest)');   // 휴식 블루
+  document.documentElement.style.setProperty('--glow','var(--rest-glow)');
+  $('phone').classList.add('resting');
+  $('gauge').classList.add('rest');
+  $('unit').textContent='초';
+  $('phaseLabel').textContent='다음 SET '+(curSet+1)+' 준비';
+  $('phaseLabel').style.color='var(--rest)';
+  $('status').innerHTML='<b style="color:var(--rest)">휴식 중</b> · 에너지 회복';
+  $('modePill').textContent='휴식중';
+  $('modePill').classList.remove('blinking');
+  render(0);
+}
+function finish(){
+  mode='done';
+  $('doneText').innerHTML=`<b style="color:var(--txt)">${cfg.label}</b> 강도 · 총 <b style="color:var(--txt)">${totalSets}세트</b> 완료`;
+  $('modePill').textContent='완료';
+  show('done');
+}
+
+/* ===== 루프 ===== */
+function loop(ts){
+  if(!lastTs) lastTs=ts;
+  const dt=(ts-lastTs)/1000; lastTs=ts;
+
+  if(mode==='run'||mode==='rest'){
+    phaseElapsed+=dt;
+    const t=Math.min(phaseElapsed/phaseDur,1);
+    const energy = mode==='run' ? 100*(1-t) : 100*t;
+    render(energy);
+
+    if(phaseElapsed>=phaseDur){
+      if(mode==='run'){
+        flashComplete();
+        if(curSet<totalSets){ beginRest(); }          // 다음 세트 전 휴식
+        else { setTimeout(finish,650); mode='idle'; }  // N번 진행 후 마무리
+      } else {                                          // 휴식 끝 → 다음 세트
+        curSet++; beginRun();
+      }
+    }
+  }
+  if(mode!=='done') requestAnimationFrame(loop);
+}
+
+/* ===== 그리기 ===== */
+function render(energy){
+  energy=Math.max(0,Math.min(100,energy));
+  ring.style.strokeDashoffset = C*(1 - energy/100);
+  if(mode==='rest'){
+    $('energyNum').textContent = Math.max(0, Math.ceil(phaseDur - phaseElapsed));  // 남은 휴식 초
+  } else {
+    $('energyNum').textContent = Math.round(energy);                               // 에너지 %
+  }
+}
+
+/* ===== 세트 완료 플래시 ===== */
+function flashComplete(){
+  const f=$('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+}
+
+/* ===== 일시정지 / 재개 (모든 활성 상태에서) ===== */
+$('pauseBtn').onclick=()=>{
+  if(mode==='run'||mode==='rest'){
+    prevMode=mode; mode='paused';
+    $('gauge').style.animationPlayState='paused';
+    $('pauseBtn').textContent='계속하기';
+    $('status').innerHTML='<b>일시정지됨</b> · 탭하면 이어서 진행';
+    $('modePill').textContent='일시정지'; $('modePill').classList.add('blinking');
+  } else if(mode==='paused'){
+    mode=prevMode; lastTs=0;            // 시간 점프 방지
+    $('gauge').style.animationPlayState='';
+    $('pauseBtn').textContent='일시정지';
+    if(mode==='run'){$('status').innerHTML='게이지 감소 중… <b>0%가 되면 세트 완료</b>';$('modePill').textContent='SET '+curSet+' 작동';}
+    else {$('status').innerHTML='<b style="color:var(--rest)">휴식 중</b> · 에너지 회복';$('modePill').textContent='휴식중';}
+    $('modePill').classList.remove('blinking');
+  }
+};
+
+/* ===== 종료 → 대기로 ===== */
+function reset(){
+  mode='idle'; prevMode=null; lastTs=0; curSet=0;
+  $('pauseBtn').textContent='일시정지';
+  $('modePill').textContent='대기'; $('modePill').classList.remove('blinking');
+  $('phone').classList.remove('resting');
+  $('gauge').classList.remove('rest'); $('gauge').style.animationPlayState='';
+  $('unit').textContent='%';
+  document.documentElement.style.setProperty('--accent','#ffb02e');
+  document.documentElement.style.setProperty('--glow','rgba(255,176,46,.45)');
+  show('idle');
+}
+$('stopBtn').onclick=reset;
+$('restartBtn').onclick=reset;
+</script>
+</body>
+</html>
