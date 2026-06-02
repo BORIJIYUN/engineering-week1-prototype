@@ -64,22 +64,29 @@
   .dot.done{background:var(--accent)}
   .dot.active{background:var(--accent);box-shadow:0 0 0 4px var(--glow);transform:scale(1.15)}
 
-  /* ----- 중앙 게이지 ----- */
+  /* ----- 중앙 게이지 (원형 챔버) ----- */
   .stage{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;position:relative}
-  .gauge{position:relative;width:260px;height:260px;display:flex;justify-content:center;align-items:center;transition:transform .4s}
-  .gauge svg{transform:rotate(-90deg);position:absolute;inset:0}
-  .gauge .track{fill:none;stroke:var(--ring-track);stroke-width:14}
-  .gauge .prog{fill:none;stroke:var(--accent);stroke-width:14;stroke-linecap:round;
-               filter:drop-shadow(0 0 10px var(--glow));transition:stroke .4s}
-  .gauge.rest{animation:breathe 3.2s ease-in-out infinite}
-  @keyframes breathe{0%,100%{transform:scale(.97)}50%{transform:scale(1.04)}}
-  .center{display:flex;flex-direction:column;align-items:center;z-index:2}
-  .rest-tag{display:none;align-items:center;gap:6px;font-size:13px;font-weight:600;
-            letter-spacing:.1em;color:var(--rest);margin-bottom:6px}
-  .gauge.rest .rest-tag{display:flex}
-  .energy{font-family:'Anton',sans-serif;font-size:84px;line-height:.9;letter-spacing:.01em}
-  .energy small{font-size:30px;color:var(--sub);margin-left:2px}
-  .stlabel{margin-top:8px;font-size:14px;letter-spacing:.16em;color:var(--sub);font-weight:600;text-transform:uppercase}
+  .gauge{position:relative;display:flex;flex-direction:column;align-items:center;transition:transform .4s}
+  .gauge.rest{animation:breathe 3.6s ease-in-out infinite}
+  @keyframes breathe{0%,100%{transform:scale(.985)}50%{transform:scale(1.02)}}
+
+  .hg{width:280px;height:280px;overflow:visible;flex:none}
+  .hg .ring-outer{fill:#0a0d12}                                    /* 외곽 두꺼운 링 */
+  .hg .ring-dots{fill:#1a1f2a}                                     /* 링 위 점 패턴 */
+  .hg .chamber-bg{fill:var(--accent);opacity:.18;transition:fill .4s,opacity .4s}
+  .hg .ring-stroke{fill:none;stroke:var(--accent);stroke-width:1.2;opacity:.55;transition:stroke .4s}
+  .hg .sand{fill:var(--accent);transition:fill .4s;filter:drop-shadow(0 -2px 12px var(--glow))}
+  .hg .sand-back{fill:var(--accent);opacity:.55;transition:fill .4s}
+  .hg.flowing .sand{animation:wave 3.2s ease-in-out infinite}
+  .hg.flowing .sand-back{animation:wave 3.2s ease-in-out infinite reverse}
+  @keyframes wave{0%,100%{transform:translateX(-6px)}50%{transform:translateX(6px)}}
+
+  .icon-top{display:none}
+
+  .center{position:absolute;inset:0;display:flex;flex-direction:column;
+          justify-content:center;align-items:center;z-index:2;pointer-events:none}
+  .energy{font-family:'Anton',sans-serif;font-size:104px;line-height:.9;letter-spacing:.01em}
+  .stlabel{margin-top:10px;font-size:12px;letter-spacing:.18em;color:var(--sub);font-weight:600;text-transform:uppercase}
 
   .status{margin-top:34px;font-size:15px;color:var(--sub);min-height:22px;text-align:center;font-weight:400}
   .status b{color:var(--txt);font-weight:600}
@@ -119,15 +126,6 @@
              display:flex;justify-content:center;align-items:center;margin:0 auto 24px;
              box-shadow:0 10px 30px var(--glow);font-size:44px}
 
-  /* 세트완료 플래시 */
-  .flash{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;
-         pointer-events:none;opacity:0;z-index:20}
-  .flash span{font-family:'Anton',sans-serif;font-size:40px;color:var(--accent);
-              text-shadow:0 0 30px var(--glow);letter-spacing:.04em}
-  @keyframes flashpop{0%{opacity:0;transform:scale(.6)}25%{opacity:1;transform:scale(1)}
-                      75%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.15)}}
-  .flash.go{animation:flashpop 1s ease forwards}
-
   .hidden{display:none!important}
   .fade{animation:fade .4s ease}
   @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -159,17 +157,44 @@
     <!-- ===== 작동 / 휴식 ===== -->
     <div id="view-active" class="stage hidden">
       <div class="dots" id="dots"></div>
-      <div class="gauge" id="gauge" style="margin-top:24px">
-        <svg viewBox="0 0 260 260">
-          <circle class="track" cx="130" cy="130" r="115"/>
-          <circle class="prog"  cx="130" cy="130" r="115" id="ring"/>
+      <div class="gauge" id="gauge" style="margin-top:6px">
+        <svg class="hg" id="hg" viewBox="0 0 200 200">
+          <defs>
+            <!-- 챔버 안쪽만 모래가 보이도록 클리핑 -->
+            <clipPath id="chamberClip"><circle cx="100" cy="100" r="78"/></clipPath>
+            <!-- 외곽 링 위 점 패턴 -->
+            <pattern id="dots" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
+              <circle cx="3" cy="3" r=".7" fill="#262c38"/>
+            </pattern>
+            <mask id="ringMask">
+              <rect width="200" height="200" fill="black"/>
+              <circle cx="100" cy="100" r="98" fill="white"/>
+              <circle cx="100" cy="100" r="82" fill="black"/>
+            </mask>
+          </defs>
+
+          <!-- 외곽 링 (어두운 배경) -->
+          <circle class="ring-outer" cx="100" cy="100" r="98"/>
+          <!-- 외곽 링 점 패턴 -->
+          <rect x="0" y="0" width="200" height="200" fill="url(#dots)" mask="url(#ringMask)"/>
+          <!-- 챔버 안쪽 살짝 강도색 -->
+          <circle class="chamber-bg" cx="100" cy="100" r="78"/>
+
+          <!-- 모래(에너지) - 챔버 클리핑 안에서만 보임 -->
+          <g clip-path="url(#chamberClip)">
+            <!-- 뒤쪽 물결 (살짝 흐릿한 보조) -->
+            <path class="sand-back" id="sandBack" d=""/>
+            <!-- 앞쪽 메인 물결 -->
+            <path class="sand" id="sandFront" d=""/>
+          </g>
+
+          <!-- 챔버 외곽선 (얇은 강도색 링) -->
+          <circle class="ring-stroke" cx="100" cy="100" r="78"/>
         </svg>
         <div class="center">
-          <div class="rest-tag">💤 휴식</div>
-          <div class="energy"><span id="energyNum">100</span><small id="unit">%</small></div>
+          <div class="energy"><span id="energyNum">100</span></div>
           <div class="stlabel" id="phaseLabel">SET 1</div>
         </div>
-        <div class="flash" id="flash"><span>세트 완료!</span></div>
       </div>
       <div class="status" id="status">게이지 감소 중…</div>
       <div class="controls" style="width:100%">
@@ -203,7 +228,8 @@ const INTENSITY = {
 const REST_SEC = 8;            // 휴식 시간(초): 에너지 0→100 자동 회복
 
 /* ===== 상태 ===== */
-const R = 115, C = 2 * Math.PI * R;       // 게이지 원 둘레
+/* 챔버 원: (cx,cy)=(100,100), r=78 → 차오르는 영역 y: 22(맨 위) ~ 178(맨 아래) */
+const CY=100, R=78, TOP_Y=CY-R, BOT_Y=CY+R, SPAN=R*2;
 let mode='idle';                          // idle | run | rest | paused | done
 let prevMode=null;                        // 일시정지 복귀용
 let cfg=null, curSet=0, totalSets=0;
@@ -211,7 +237,7 @@ let phaseDur=0, phaseElapsed=0, lastTs=0;
 
 /* ===== 엘리먼트 ===== */
 const $=id=>document.getElementById(id);
-const ring=$('ring'); ring.style.strokeDasharray=C;
+const sandFront=$('sandFront'), sandBack=$('sandBack'), hg=$('hg');
 const views={idle:$('view-idle'),active:$('view-active'),done:$('view-done')};
 
 /* ===== 강도 선택 버튼 만들기 ===== */
@@ -265,24 +291,22 @@ function paintDots(){
 /* ===== 단계 진입 ===== */
 function beginRun(){
   mode='run'; phaseDur=cfg.setSec; phaseElapsed=0;
-  setAccent(cfg);                                   // 강도 색으로 복귀
+  setAccent(cfg);
   $('phone').classList.remove('resting');
   $('gauge').classList.remove('rest');
-  $('unit').textContent='%';
   $('phaseLabel').textContent='SET '+curSet;
   $('phaseLabel').style.color='';
-  $('status').innerHTML='게이지 감소 중… <b>0%가 되면 세트 완료</b>';
+  $('status').innerHTML='';
   $('modePill').textContent='SET '+curSet+' 작동';
   $('modePill').classList.remove('blinking');
   paintDots(); render(100);
 }
 function beginRest(){
   mode='rest'; phaseDur=REST_SEC; phaseElapsed=0;
-  document.documentElement.style.setProperty('--accent','var(--rest)');   // 휴식 블루
+  document.documentElement.style.setProperty('--accent','var(--rest)');
   document.documentElement.style.setProperty('--glow','var(--rest-glow)');
   $('phone').classList.add('resting');
   $('gauge').classList.add('rest');
-  $('unit').textContent='초';
   $('phaseLabel').textContent='다음 SET '+(curSet+1)+' 준비';
   $('phaseLabel').style.color='var(--rest)';
   $('status').innerHTML='<b style="color:var(--rest)">휴식 중</b> · 에너지 회복';
@@ -310,9 +334,8 @@ function loop(ts){
 
     if(phaseElapsed>=phaseDur){
       if(mode==='run'){
-        flashComplete();
         if(curSet<totalSets){ beginRest(); }          // 다음 세트 전 휴식
-        else { setTimeout(finish,650); mode='idle'; }  // N번 진행 후 마무리
+        else { finish(); }                             // N번 진행 후 마무리
       } else {                                          // 휴식 끝 → 다음 세트
         curSet++; beginRun();
       }
@@ -321,21 +344,39 @@ function loop(ts){
   if(mode!=='done') requestAnimationFrame(loop);
 }
 
-/* ===== 그리기 ===== */
+/* ===== 그리기 (원형 챔버 + 물결 모래) ===== */
+function wavePath(level, amp, phase){
+  // 표면 y가 level인 부드러운 파동, 아래쪽으로 가득 채우기
+  const x0=-20, x1=220, w=x1-x0, steps=4;
+  let d=`M ${x0} ${level}`;
+  for(let i=1;i<=steps;i++){
+    const x  = x0 + (w/steps)*i;
+    const cx = x - (w/steps)*0.5;
+    const cy1 = level + Math.sin((i-1)*Math.PI + phase) * amp;
+    const cy2 = level + Math.sin(i*Math.PI + phase) * amp;
+    const ey  = level + Math.cos(i*1.7 + phase) * amp * 0.4;
+    d += ` C ${cx} ${cy1}, ${cx} ${cy2}, ${x} ${ey}`;
+  }
+  d += ` L ${x1} 220 L ${x0} 220 Z`;
+  return d;
+}
 function render(energy){
   energy=Math.max(0,Math.min(100,energy));
-  ring.style.strokeDashoffset = C*(1 - energy/100);
+  // 표면 y: 100%면 챔버 맨 위, 0%면 챔버 맨 아래
+  const surfaceY = TOP_Y + SPAN*(1 - energy/100);
+  const amp = (energy>2 && energy<98) ? 3.2 : 1.2;
+  sandFront.setAttribute('d', wavePath(surfaceY,       amp,       0));
+  sandBack .setAttribute('d', wavePath(surfaceY + 2.5, amp*0.8,   Math.PI));
+  hg.classList.toggle('flowing', mode==='run' || mode==='rest');
+
   if(mode==='rest'){
-    $('energyNum').textContent = Math.max(0, Math.ceil(phaseDur - phaseElapsed));  // 남은 휴식 초
+    $('energyNum').textContent = Math.max(0, Math.ceil(phaseDur - phaseElapsed));
   } else {
-    $('energyNum').textContent = Math.round(energy);                               // 에너지 %
+    $('energyNum').textContent = Math.round(energy);
   }
 }
 
-/* ===== 세트 완료 플래시 ===== */
-function flashComplete(){
-  const f=$('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
-}
+/* ===== 세트 완료 ===== */
 
 /* ===== 일시정지 / 재개 (모든 활성 상태에서) ===== */
 $('pauseBtn').onclick=()=>{
@@ -349,7 +390,7 @@ $('pauseBtn').onclick=()=>{
     mode=prevMode; lastTs=0;            // 시간 점프 방지
     $('gauge').style.animationPlayState='';
     $('pauseBtn').textContent='일시정지';
-    if(mode==='run'){$('status').innerHTML='게이지 감소 중… <b>0%가 되면 세트 완료</b>';$('modePill').textContent='SET '+curSet+' 작동';}
+    if(mode==='run'){$('status').innerHTML='';$('modePill').textContent='SET '+curSet+' 작동';}
     else {$('status').innerHTML='<b style="color:var(--rest)">휴식 중</b> · 에너지 회복';$('modePill').textContent='휴식중';}
     $('modePill').classList.remove('blinking');
   }
@@ -362,7 +403,6 @@ function reset(){
   $('modePill').textContent='대기'; $('modePill').classList.remove('blinking');
   $('phone').classList.remove('resting');
   $('gauge').classList.remove('rest'); $('gauge').style.animationPlayState='';
-  $('unit').textContent='%';
   document.documentElement.style.setProperty('--accent','#ffb02e');
   document.documentElement.style.setProperty('--glow','rgba(255,176,46,.45)');
   show('idle');
