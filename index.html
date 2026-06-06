@@ -35,22 +35,20 @@
     overflow:hidden;
   }
 
-  /* ----- 폰(휴대폰 프레임) ----- */
+  /* ----- 앱 컨테이너 (모바일 비율, 프레임 없음) ----- */
   .phone{
     position:relative;
-    width:390px;height:780px;max-height:96vh;
-    background:radial-gradient(120% 80% at 50% 0%, #1a1f2b 0%, var(--bg) 55%);
-    border-radius:42px;
-    border:1px solid #20252f;
-    box-shadow:0 40px 90px rgba(0,0,0,.6), inset 0 0 0 6px #05070b;
+    width:390px;height:780px;max-height:100vh;
+    background:transparent;
     overflow:hidden;
     display:flex;flex-direction:column;
     transition:background .6s ease;
   }
-  .phone.resting{background:radial-gradient(120% 80% at 50% 0%, #15263e 0%, #0a0f17 58%)}
-  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:130px;height:26px;background:#05070b;border-radius:0 0 18px 18px;z-index:30}
+  .phone.resting{background:transparent}
+  body.resting{background:radial-gradient(120% 80% at 50% 0%, #15263e 0%, #0a0f17 58%)}
+  body{background:radial-gradient(120% 80% at 50% 0%, #1a1f2b 0%, var(--bg) 55%);transition:background .6s ease}
 
-  .screen{flex:1;display:flex;flex-direction:column;padding:54px 26px 30px;position:relative}
+  .screen{flex:1;display:flex;flex-direction:column;padding:34px 26px 30px;position:relative}
 
   /* ----- 상단 헤더 ----- */
   .top{display:flex;justify-content:space-between;align-items:center;min-height:30px}
@@ -137,7 +135,6 @@
 </head>
 <body>
 <div class="phone" id="phone">
-  <div class="notch"></div>
   <div class="screen">
 
     <div class="top">
@@ -292,7 +289,7 @@ function paintDots(){
 function beginRun(){
   mode='run'; phaseDur=cfg.setSec; phaseElapsed=0;
   setAccent(cfg);
-  $('phone').classList.remove('resting');
+  $('phone').classList.remove('resting');document.body.classList.remove('resting');
   $('gauge').classList.remove('rest');
   $('phaseLabel').textContent='SET '+curSet;
   $('phaseLabel').style.color='';
@@ -305,7 +302,7 @@ function beginRest(){
   mode='rest'; phaseDur=REST_SEC; phaseElapsed=0;
   document.documentElement.style.setProperty('--accent','var(--rest)');
   document.documentElement.style.setProperty('--glow','var(--rest-glow)');
-  $('phone').classList.add('resting');
+  $('phone').classList.add('resting');document.body.classList.add('resting');
   $('gauge').classList.add('rest');
   $('phaseLabel').textContent='다음 SET '+(curSet+1)+' 준비';
   $('phaseLabel').style.color='var(--rest)';
@@ -401,7 +398,7 @@ function reset(){
   mode='idle'; prevMode=null; lastTs=0; curSet=0;
   $('pauseBtn').textContent='일시정지';
   $('modePill').textContent='대기'; $('modePill').classList.remove('blinking');
-  $('phone').classList.remove('resting');
+  $('phone').classList.remove('resting');document.body.classList.remove('resting');
   $('gauge').classList.remove('rest'); $('gauge').style.animationPlayState='';
   document.documentElement.style.setProperty('--accent','#ffb02e');
   document.documentElement.style.setProperty('--glow','rgba(255,176,46,.45)');
